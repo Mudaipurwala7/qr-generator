@@ -7,32 +7,44 @@ import pandas as pd
 
 app = Flask(__name__)
 
-HTML_TEMPLATE = """
+# HTML page for upload
+HTML_UPLOAD = """
 <!doctype html>
 <title>Bulk QR Code Generator</title>
 <h2>Upload CSV to Generate QR Codes</h2>
 <form action="/generate" method=post enctype=multipart/form-data>
-  <input type=file name=file>
-  <input type=submit value=Generate>
+  <input type=file name=file accept=".csv" required>
+  <input type=submit value="Generate QR Codes">
 </form>
+"""
+
+# HTML page while processing
+HTML_PROCESSING = """
+<!doctype html>
+<title>Generating...</title>
+<h2>Processing your file, please wait...</h2>
+<p>This may take a few seconds depending on file size.</p>
 """
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_TEMPLATE)
+    return render_template_string(HTML_UPLOAD)
 
 @app.route('/generate', methods=['POST'])
 def generate_qr():
     if 'file' not in request.files:
-        return 'No file part'
+        return 'No file part in request.'
     file = request.files['file']
     if file.filename == '':
-        return 'No selected file'
+        return 'No selected file.'
 
-    df = pd.read_csv(file)
-    
+    try:
+        df = pd.read_csv(file)
+    except Exception as e:
+        return f'Error reading CSV: {str(e)}'
+
     if df.shape[1] != 3:
-        return 'CSV must have three columns: Thaali Number, Name, ID Number.'
+        return 'CSV must have exactly three columns: Thaali Number, Name, ID Number.'
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w') as zipf:
@@ -44,7 +56,15 @@ def generate_qr():
             zipf.writestr(f'qr_{i+1}.png', img_byte_arr.getvalue())
 
     zip_buffer.seek(0)
-    return send_file(zip_buffer, mimetype='application/zip', download_name='qr_codes.zip', as_attachment=True)
+
+    return send_file(
+        zip_buffer,
+        mimetype='application/zip',
+        download_name='qr_codes.zip',
+        as_attachment=True
+    )
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
