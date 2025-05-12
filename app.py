@@ -7,8 +7,7 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# HTML page for upload
-HTML_UPLOAD = """
+HTML_TEMPLATE = """
 <!doctype html>
 <title>Bulk QR Code Generator</title>
 <h2>Upload CSV to Generate QR Codes</h2>
@@ -18,17 +17,9 @@ HTML_UPLOAD = """
 </form>
 """
 
-# HTML page while processing
-HTML_PROCESSING = """
-<!doctype html>
-<title>Generating...</title>
-<h2>Processing your file, please wait...</h2>
-<p>This may take a few seconds depending on file size.</p>
-"""
-
 @app.route('/')
 def index():
-    return render_template_string(HTML_UPLOAD)
+    return render_template_string(HTML_TEMPLATE)
 
 @app.route('/generate', methods=['POST'])
 def generate_qr():
@@ -43,26 +34,31 @@ def generate_qr():
     except Exception as e:
         return f'Error reading CSV: {str(e)}'
 
-    if df.shape[1] != 3:
-        return 'CSV must have exactly three columns: Thaali Number, Name, ID Number.'
+    expected_col = "ITS Members List (Je Sagla mumineen thaali ma si jame che)"
+    if expected_col not in df.columns or len(df.columns) != 5:
+        return 'CSV must have exactly 5 columns with the last column named exactly: ITS Members List (Je Sagla mumineen thaali ma si jame che)'
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w') as zipf:
         for i, row in df.iterrows():
-            qr_content = f"Thaali Number: {row[0]}\nName: {row[1]}\nID Number: {row[2]}"
+            its_list = str(row[expected_col]).replace(';', ',').split(',')
+            its_lines = '\n'.join([f"- {its.strip()}" for its in its_list if its.strip()])
+
+            qr_content = (
+                f"Tiffin Number: {row[0]}\n"
+                f"HOF ITS: {row[1]}\n"
+                f"Name: {row[2]}\n"
+                f"Sabeel Number: {row[3]}\n"
+                f"ITS Members List (Je Sagla mumineen thaali ma si jame che):\n{its_lines}"
+            )
+
             img = qrcode.make(qr_content)
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             zipf.writestr(f'qr_{i+1}.png', img_byte_arr.getvalue())
 
     zip_buffer.seek(0)
-
-    return send_file(
-        zip_buffer,
-        mimetype='application/zip',
-        download_name='qr_codes.zip',
-        as_attachment=True
-    )
+    return send_file(zip_buffer, mimetype='application/zip', download_name='qr_codes.zip', as_attachment=True)
 
 if __name__ == '__main__':
     import os
