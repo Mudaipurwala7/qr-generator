@@ -113,7 +113,7 @@ def generate_qr():
 
     expected_col = "ITS Members List (Je Sagla mumineen thaali ma si jame che)"
     if expected_col not in df.columns or len(df.columns) != 5:
-        return 'CSV must have 5 columns including: "ITS Members List (Je Sagla mumineen thaali ma si jame che)"'
+        return 'CSV must have 5 columns including: "Tiffin Number , HOF ITS, Name, Sabeel Number, ITS Members List (Je Sagla mumineen thaali ma si jame che)"'
 
     zip_buffer = io.BytesIO()
     try:
