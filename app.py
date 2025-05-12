@@ -10,14 +10,85 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB file limit
 
 HTML_TEMPLATE = """
 <!doctype html>
-<title>Bulk QR Code Generator</title>
-<h2>Upload CSV to Generate QR Codes</h2>
-<p>Required Columns: Tiffin Number, HOF ITS, Name, Sabeel Number, ITS Members List (Je Sagla mumineen thaali ma si jame che)</p>
-<form action="/generate" method=post enctype=multipart/form-data>
-  <input type=file name=file accept=".csv" required>
-  <input type=submit value="Generate QR Codes">
-</form>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bulk QR Code Generator</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 50px;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    p {
+      color: #555;
+      font-size: 14px;
+      margin-bottom: 30px;
+      max-width: 500px;
+      text-align: center;
+    }
+    
+    form {
+      background-color: #fff;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    input[type="file"] {
+      margin-bottom: 20px;
+    }
+    input[type="submit"] {
+      background-color: #2e86de;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    input[type="submit"]:hover {
+      background-color: #1e5faa;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bulk QR Code Generator</h1>
+  <p>
+    Upload a CSV file with the following columns:<br>
+    <strong>Tiffin Number, HOF ITS, Name, Sabeel Number, ITS Members List (Je Sagla mumineen thaali ma si jame che)</strong><br>
+    You will receive a zip file with one QR code per row.
+  </p>
+  <a href="/sample-template" style="
+  margin-bottom: 20px;
+  background-color: #27ae60;
+  color: white;
+  padding: 10px 16px;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 500;
+">
+  ⬇️ Download Sample CSV
+</a>
+
+  <form action="/generate" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv" required>
+    <input type="submit" value="Generate QR Codes">
+  </form>
+</body>
+</html>
 """
+
 
 @app.route('/')
 def index():
@@ -68,6 +139,13 @@ def generate_qr():
 
     zip_buffer.seek(0)
     return send_file(zip_buffer, mimetype='application/zip', download_name='qr_codes.zip', as_attachment=True)
+
+from flask import send_from_directory
+
+@app.route('/sample-template')
+def download_sample():
+    return send_from_directory('static', 'sample_template.csv', as_attachment=True)
+
 
 if __name__ == '__main__':
     import os
