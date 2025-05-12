@@ -80,6 +80,9 @@ HTML_TEMPLATE = """
 ">
   ⬇️ Download Sample CSV
 </a>
+<p style="font-size: 13px; color: #c0392b; margin-top: 5px; margin-bottom: 20px;">
+  ⚠️ Please do not modify the first row (headers) of the CSV file. Just fill in your data below it.
+</p>
 
   <form action="/generate" method="post" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv" required>
