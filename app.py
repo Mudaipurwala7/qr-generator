@@ -135,19 +135,27 @@ def generate_qr():
                         f"ITS Members List (Je Sagla mumineen thaali ma si jame che):\n{its_lines}"
                     )
 
-                    qr_img = qrcode.make(qr_content).convert("RGB")
+                    qr = qrcode.QRCode(
+                        version=1,
+                        error_correction=qrcode.constants.ERROR_CORRECT_L,
+                        box_size=6,
+                        border=2
+                    )
+                    qr.add_data(qr_content)
+                    qr.make(fit=True)
+                    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
-                    label_height = 40
+                    label_height = 50
                     final_img = Image.new("RGB", (qr_img.width, qr_img.height + label_height), "white")
                     final_img.paste(qr_img, (0, 0))
 
                     draw = ImageDraw.Draw(final_img)
                     try:
-                        font = ImageFont.truetype("arial.ttf", 20)
+                        font = ImageFont.truetype("arial.ttf", 22)
                     except:
                         font = ImageFont.load_default()
 
-                    label_text = f"Tiffin Number: {tiffin_number}"
+                    label_text = f"Tiffin #: {tiffin_number}"
                     text_box = draw.textbbox((0, 0), label_text, font=font)
                     text_width = text_box[2] - text_box[0]
                     draw.text(((qr_img.width - text_width) // 2, qr_img.height + 10), label_text, fill="black", font=font)
