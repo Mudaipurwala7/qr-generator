@@ -1,5 +1,6 @@
-from flask import Flask, request, send_file, render_template_string
+from flask import Flask, request, send_file, render_template_string, send_from_directory
 import qrcode
+from PIL import Image, ImageDraw, ImageFont
 import zipfile
 import os
 import io
@@ -34,7 +35,6 @@ HTML_TEMPLATE = """
       max-width: 500px;
       text-align: center;
     }
-    
     form {
       background-color: #fff;
       padding: 30px 40px;
@@ -70,20 +70,19 @@ HTML_TEMPLATE = """
     You will receive a zip file with one QR code per row.
   </p>
   <a href="/sample-template" style="
-  margin-bottom: 20px;
-  background-color: #27ae60;
-  color: white;
-  padding: 10px 16px;
-  text-decoration: none;
-  border-radius: 6px;
-  font-weight: 500;
-">
-  ⬇️ Download Sample CSV
-</a>
-<p style="font-size: 13px; color: #c0392b; margin-top: 5px; margin-bottom: 20px;">
-  ⚠️ Please do not modify the first row (headers) of the CSV file. Just fill in your data below it.
-</p>
-
+    margin-bottom: 20px;
+    background-color: #27ae60;
+    color: white;
+    padding: 10px 16px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+  ">
+    ⬇️ Download Sample CSV
+  </a>
+  <p style="font-size: 13px; color: #c0392b; margin-top: 5px; margin-bottom: 20px;">
+    ⚠️ Please do not modify the first row (headers) of the CSV file. Just fill in your data below it.
+  </p>
   <form action="/generate" method="post" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv" required>
     <input type="submit" value="Generate QR Codes">
@@ -91,7 +90,6 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
-
 
 @app.route('/')
 def index():
@@ -120,37 +118,56 @@ def generate_qr():
         with zipfile.ZipFile(zip_buffer, 'w') as zipf:
             for i, row in df.iterrows():
                 try:
-                    its_list = str(row[expected_col]).replace(';', ',').split(',')
+                    tiffin_number = row.iloc[0]
+                    hof_its = row.iloc[1]
+                    name = row.iloc[2]
+                    sabeel = row.iloc[3]
+                    its_list_raw = str(row[expected_col])
+
+                    its_list = its_list_raw.replace(';', ',').split(',')
                     its_lines = '\n'.join([f"- {its.strip()}" for its in its_list if its.strip()])
 
                     qr_content = (
-                        f"Tiffin Number: {row[0]}\n"
-                        f"HOF ITS: {row[1]}\n"
-                        f"Name: {row[2]}\n"
-                        f"Sabeel Number: {row[3]}\n"
+                        f"Tiffin Number: {tiffin_number}\n"
+                        f"HOF ITS: {hof_its}\n"
+                        f"Name: {name}\n"
+                        f"Sabeel Number: {sabeel}\n"
                         f"ITS Members List (Je Sagla mumineen thaali ma si jame che):\n{its_lines}"
                     )
 
-                    img = qrcode.make(qr_content)
+                    qr_img = qrcode.make(qr_content).convert("RGB")
+
+                    label_height = 40
+                    final_img = Image.new("RGB", (qr_img.width, qr_img.height + label_height), "white")
+                    final_img.paste(qr_img, (0, 0))
+
+                    draw = ImageDraw.Draw(final_img)
+                    try:
+                        font = ImageFont.truetype("arial.ttf", 20)
+                    except:
+                        font = ImageFont.load_default()
+
+                    label_text = f"Tiffin Number: {tiffin_number}"
+                    text_box = draw.textbbox((0, 0), label_text, font=font)
+                    text_width = text_box[2] - text_box[0]
+                    draw.text(((qr_img.width - text_width) // 2, qr_img.height + 10), label_text, fill="black", font=font)
+
                     img_byte_arr = io.BytesIO()
-                    img.save(img_byte_arr, format='PNG')
-                    zipf.writestr(f'qr_{i+1}.png', img_byte_arr.getvalue())
+                    final_img.save(img_byte_arr, format='PNG')
+                    zipf.writestr(f'qr_{i+1}_tiffin_{tiffin_number}.png', img_byte_arr.getvalue())
                 except Exception as qr_err:
-                    continue  # Skip row if QR generation fails
+                    print(f"Error on row {i+1}: {qr_err}")
+                    continue
     except Exception as e:
         return f"An error occurred while generating QR codes: {str(e)}"
 
     zip_buffer.seek(0)
     return send_file(zip_buffer, mimetype='application/zip', download_name='qr_codes.zip', as_attachment=True)
 
-from flask import send_from_directory
-
 @app.route('/sample-template')
 def download_sample():
     return send_from_directory('static', 'sample_template.csv', as_attachment=True)
 
-
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
