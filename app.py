@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, request, send_file, render_template_string, send_from_directory
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
@@ -16,58 +17,26 @@ HTML_TEMPLATE = """
   <meta charset="UTF-8">
   <title>Bulk QR Code Generator</title>
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f6f8;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 50px;
-    }
-    h1 {
-      color: #333;
-      margin-bottom: 10px;
-    }
-    p {
-      color: #555;
-      font-size: 14px;
-      margin-bottom: 30px;
-      max-width: 500px;
-      text-align: center;
-    }
-    form {
-      background-color: #fff;
-      padding: 30px 40px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    input[type="file"] {
-      margin-bottom: 20px;
-    }
-    input[type="submit"] {
-      background-color: #2e86de;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-    }
-    input[type="submit"]:hover {
-      background-color: #1e5faa;
-    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8;
+           display: flex; flex-direction: column; align-items: center; padding: 50px; }
+    h1 { color: #333; margin-bottom: 10px; }
+    p { color: #555; font-size: 14px; margin-bottom: 30px; max-width: 500px; text-align: center; }
+    form { background-color: #fff; padding: 30px 40px; border-radius: 12px;
+           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column;
+           align-items: center; }
+    input[type="file"] { margin-bottom: 20px; }
+    input[type="submit"] { background-color: #2e86de; color: white; border: none;
+           padding: 10px 20px; border-radius: 6px; font-size: 16px; cursor: pointer;
+           transition: background-color 0.3s ease; }
+    input[type="submit"]:hover { background-color: #1e5faa; }
   </style>
 </head>
 <body>
   <h1>Bulk QR Code Generator</h1>
   <p>
-    Upload a CSV file with the following columns:<br>
-    <strong>Tiffin Number, HOF ITS, Name, Sabeel Number, ITS Members List (Je Sagla mumineen thaali ma si jame che)</strong><br>
-    You will receive a zip file with one QR code per row.
+    Upload a CSV file with the single column:<br>
+    <strong>Tiffin Number</strong><br>
+    You will receive a ZIP file containing one QR-PNG per row.
   </p>
   <a href="/sample-template" style="
     margin-bottom: 20px;
@@ -81,7 +50,7 @@ HTML_TEMPLATE = """
     ⬇️ Download Sample CSV
   </a>
   <p style="font-size: 13px; color: #c0392b; margin-top: 5px; margin-bottom: 20px;">
-    ⚠️ Please do not modify the first row (headers) of the CSV file. Just fill in your data below it.
+    ⚠️ Please do not modify the first row (header) of the CSV. Just fill in your Tiffin numbers below it.
   </p>
   <form action="/generate" method="post" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv" required>
@@ -109,42 +78,29 @@ def generate_qr():
     except Exception as e:
         return f'Failed to read CSV file. Error: {str(e)}'
 
-    expected_col = "ITS Members List (Je Sagla mumineen thaali ma si jame che)"
-    if expected_col not in df.columns or len(df.columns) != 5:
-        return 'CSV must have 5 columns including: "Tiffin Number , HOF ITS, Name, Sabeel Number, ITS Members List (Je Sagla mumineen thaali ma si jame che)"'
+    # Only one required column now
+    if 'Tiffin Number' not in df.columns:
+        return 'CSV must have a header named "Tiffin Number".'
 
     zip_buffer = io.BytesIO()
     try:
         with zipfile.ZipFile(zip_buffer, 'w') as zipf:
             for i, row in df.iterrows():
                 try:
-                    tiffin_number = row.iloc[0]
-                    hof_its = row.iloc[1]
-                    name = row.iloc[2]
-                    sabeel = row.iloc[3]
-                    its_list_raw = str(row[expected_col])
+                    tiffin_number = row['Tiffin Number']
 
-                    its_list = its_list_raw.replace(';', ',').split(',')
-                    its_lines = '\n'.join([f"- {its.strip()}" for its in its_list if its.strip()])
-
-                    qr_content = (
-                        f"Tiffin Number: {tiffin_number}\n"
-                        f"HOF ITS: {hof_its}\n"
-                        f"Name: {name}\n"
-                        f"Sabeel Number: {sabeel}\n"
-                        f"ITS Members List (Je Sagla mumineen thaali ma si jame che):\n{its_lines}"
-                    )
-
+                    # QR only encodes the tiffin number
                     qr = qrcode.QRCode(
                         version=1,
                         error_correction=qrcode.constants.ERROR_CORRECT_L,
                         box_size=6,
                         border=2
                     )
-                    qr.add_data(qr_content)
+                    qr.add_data(str(tiffin_number))
                     qr.make(fit=True)
                     qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
+                    # add a label below
                     label_height = 50
                     final_img = Image.new("RGB", (qr_img.width, qr_img.height + label_height), "white")
                     final_img.paste(qr_img, (0, 0))
@@ -158,7 +114,8 @@ def generate_qr():
                     label_text = f"Tiffin #: {tiffin_number}"
                     text_box = draw.textbbox((0, 0), label_text, font=font)
                     text_width = text_box[2] - text_box[0]
-                    draw.text(((qr_img.width - text_width) // 2, qr_img.height + 10), label_text, fill="black", font=font)
+                    draw.text(((qr_img.width - text_width) // 2, qr_img.height + 10),
+                              label_text, fill="black", font=font)
 
                     img_byte_arr = io.BytesIO()
                     final_img.save(img_byte_arr, format='PNG')
@@ -170,7 +127,8 @@ def generate_qr():
         return f"An error occurred while generating QR codes: {str(e)}"
 
     zip_buffer.seek(0)
-    return send_file(zip_buffer, mimetype='application/zip', download_name='qr_codes.zip', as_attachment=True)
+    return send_file(zip_buffer, mimetype='application/zip',
+                     download_name='qr_codes.zip', as_attachment=True)
 
 @app.route('/sample-template')
 def download_sample():
